@@ -1,164 +1,176 @@
-'use client';
+"use client";
+import { useState } from "react";
 
-import { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
+const EXPENSE_TYPES = ["Airfare", "Hotel / Lodging", "Ground Transportation", "Meals & Entertainment", "Client Dinner", "Office Supplies", "Software / Subscriptions", "Training / Conference", "mileage", "Other"];
+const CATEGORIES = ["Travel", "Meals", "Lodging", "Supplies", "Software", "Professional Development", "Client Entertainment", "Other"];
+const DEPARTMENTS = ["Engineering", "Sales", "Marketing", "Operations", "Finance", "HR", "Executive", "Other"];
 
-const SYSTEM_PROMPT = `You are an expert expense reporting analyst. Generate a comprehensive expense report and reimbursement request based on the provided expense data. Include: categorized expense breakdown, total amounts per category, per-diem calculations, mileage reimbursement, receipt summary, policy compliance check, and a professional markdown report.`;
+interface ExpenseItem {
+  type: string;
+  amount: string;
+  date: string;
+  category: string;
+  merchant: string;
+  notes: string;
+}
 
 export default function ExpenseReportPage() {
-  const [employeeName, setEmployeeName] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
-  const [department, setDepartment] = useState('');
-  const [expenseType, setExpenseType] = useState('Business Travel');
-  const [tripDestination, setTripDestination] = useState('');
-  const [tripStart, setTripStart] = useState('');
-  const [tripEnd, setTripEnd] = useState('');
-  const [mileage, setMileage] = useState('');
-  const [airfare, setAirfare] = useState('');
-  const [hotelNights, setHotelNights] = useState('');
-  const [hotelRate, setHotelRate] = useState('');
-  const [meals, setMeals] = useState('');
-  const [carRental, setCarRental] = useState('');
-  const [otherExpenses, setOtherExpenses] = useState('');
-  const [result, setResult] = useState('');
+  const [submitterName, setSubmitterName] = useState("");
+  const [department, setDepartment] = useState("");
+  const [projectCode, setProjectCode] = useState("");
+  const [manager, setManager] = useState("");
+  const [additionalNotes, setAdditionalNotes] = useState("");
+  const [expenses, setExpenses] = useState<ExpenseItem[]>([{ type: "", amount: "", date: "", category: "Travel", merchant: "", notes: "" }]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [result, setResult] = useState("");
+  const [error, setError] = useState("");
+
+  const addExpense = () => {
+    setExpenses([...expenses, { type: "", amount: "", date: "", category: "Travel", merchant: "", notes: "" }]);
+  };
+
+  const removeExpense = (idx: number) => {
+    setExpenses(expenses.filter((_, i) => i !== idx));
+  };
+
+  const updateExpense = (idx: number, field: keyof ExpenseItem, value: string) => {
+    const updated = [...expenses];
+    updated[idx] = { ...updated[idx], [field]: value };
+    setExpenses(updated);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError("");
+    setResult("");
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system: SYSTEM_PROMPT,
-          messages: [{
-            role: 'user',
-            content: `Generate an expense report and reimbursement summary:\n\nEmployee: ${employeeName || 'Jane Smith'}\nEmployee ID: ${employeeId || 'EMP-042'}\nDepartment: ${department || 'Sales'}\nExpense Type: ${expenseType}\nTrip Destination: ${tripDestination || 'New York, NY'}\nTrip Dates: ${tripStart || '2024-03-01'} to ${tripEnd || '2024-03-05'}\n\nExpenses:\n- Airfare: $${airfare || '0'}\n- Hotel: ${hotelNights || '3'} nights × $${hotelRate || '180'}/night = $${(Number(hotelNights||0) * Number(hotelRate||0)).toFixed(2)}\n- Meals & Entertainment: $${meals || '0'}\n- Car Rental: $${carRental || '0'}\n- Mileage: ${mileage || '0'} miles × $0.67/mile = $${((Number(mileage)||0) * 0.67).toFixed(2)}\n- Other Expenses: $${otherExpenses || '0'}\n\nProvide a full expense report with: expense categorization, daily breakdown, per-diem policy check, total reimbursement request, receipt checklist, and approval routing recommendation.`
-          }]
-        })
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expenses: JSON.stringify(expenses), submitterName, department, projectCode, manager, additionalNotes }),
       });
       const data = await res.json();
-      setResult(data.result || data.error || 'No response.');
-    } catch { setError('Failed to generate expense report.'); }
-    setLoading(false);
+      if (!res.ok) throw new Error(data.error || "Generation failed");
+      setResult(data.result);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-950 to-gray-900 text-white">
-      <div className="max-w-5xl mx-auto px-6 py-12">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-red-400 mb-2">AI Expense Report Generator</h1>
-          <p className="text-gray-400">Create professional expense reports and reimbursement requests in seconds.</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <form onSubmit={handleSubmit} className="space-y-5 bg-gray-800/50 border border-gray-700 rounded-2xl p-6">
-            <h2 className="text-xl font-semibold text-red-300">Employee &amp; Trip Details</h2>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Employee Name</label>
-                <input value={employeeName} onChange={e => setEmployeeName(e.target.value)} placeholder="Jane Smith" className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Employee ID</label>
-                <input value={employeeId} onChange={e => setEmployeeId(e.target.value)} placeholder="EMP-042" className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Department</label>
-                <input value={department} onChange={e => setDepartment(e.target.value)} placeholder="Sales" className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Expense Type</label>
-                <select value={expenseType} onChange={e => setExpenseType(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none">
-                  <option>Business Travel</option><option>Client Entertainment</option><option>Conference</option><option>Office Supplies</option><option>Professional Development</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Trip Destination</label>
-              <input value={tripDestination} onChange={e => setTripDestination(e.target.value)} placeholder="New York, NY" className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Start Date</label>
-                <input type="date" value={tripStart} onChange={e => setTripStart(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">End Date</label>
-                <input type="date" value={tripEnd} onChange={e => setTripEnd(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none" />
-              </div>
-            </div>
-
-            <h2 className="text-xl font-semibold text-red-300 pt-2">Expense Details</h2>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Airfare ($)</label>
-                <input type="number" value={airfare} onChange={e => setAirfare(e.target.value)} placeholder="0.00" className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Car Rental ($)</label>
-                <input type="number" value={carRental} onChange={e => setCarRental(e.target.value)} placeholder="0.00" className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Hotel Nights</label>
-                <input type="number" value={hotelNights} onChange={e => setHotelNights(e.target.value)} placeholder="3" className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Hotel Rate/Night ($)</label>
-                <input type="number" value={hotelRate} onChange={e => setHotelRate(e.target.value)} placeholder="180.00" className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Meals &amp; Entertainment ($)</label>
-                <input type="number" value={meals} onChange={e => setMeals(e.target.value)} placeholder="0.00" className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Mileage (miles)</label>
-                <input type="number" value={mileage} onChange={e => setMileage(e.target.value)} placeholder="0" className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Other Expenses Description</label>
-              <input value={otherExpenses} onChange={e => setOtherExpenses(e.target.value)} placeholder="Conference registration, Wi-Fi, tips, etc." className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none" />
-            </div>
-
-            {error && <p className="text-red-400 text-sm">{error}</p>}
-
-            <button type="submit" disabled={loading} className="w-full bg-red-600 hover:bg-red-500 disabled:bg-red-800 text-white font-semibold py-3 rounded-xl transition-colors">
-              {loading ? '⚙️ Generating Expense Report...' : '📄 Generate Expense Report'}
-            </button>
-          </form>
-
-          <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-6">
-            <h2 className="text-xl font-semibold text-red-300 mb-4">Expense Report Output</h2>
-            {result ? (
-              <div className="prose prose-invert prose-sm max-w-none text-gray-200 overflow-y-auto max-h-[700px]">
-                <ReactMarkdown>{result}</ReactMarkdown>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-64 text-gray-500">
-                <p>Your expense report will appear here...</p>
-              </div>
-            )}
+    <main className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-950 to-gray-900 text-white">
+      <div className="border-b border-orange-500/20 bg-black/20">
+        <div className="max-w-5xl mx-auto px-6 py-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-orange-600 flex items-center justify-center text-xl">🧾</div>
+            <h1 className="text-3xl font-bold tracking-tight">AI Expense Report Generator</h1>
           </div>
+          <p className="text-gray-400 text-sm">Create itemized expense reports, categorize spending, and get approval routing notes.</p>
         </div>
       </div>
-    </div>
+
+      <div className="max-w-5xl mx-auto px-6 py-10">
+        <form onSubmit={handleSubmit} className="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Submitter Name</label>
+              <input type="text" value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} placeholder="Jane Smith" className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Department</label>
+              <select value={department} onChange={(e) => setDepartment(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm">
+                <option value="">Select department</option>
+                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Project Code</label>
+              <input type="text" value={projectCode} onChange={(e) => setProjectCode(e.target.value)} placeholder="PROJ-2024-001" className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Manager</label>
+              <input type="text" value={manager} onChange={(e) => setManager(e.target.value)} placeholder="John Doe" className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm" />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-300">Expense Items</h3>
+              <button type="button" onClick={addExpense} className="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 px-3 py-1 rounded-lg transition">+ Add Item</button>
+            </div>
+            <div className="space-y-3">
+              {expenses.map((exp, idx) => (
+                <div key={idx} className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Type</label>
+                      <select value={exp.type} onChange={(e) => updateExpense(idx, "type", e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        <option value="">Select type</option>
+                        {EXPENSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Amount ($)</label>
+                      <input type="number" value={exp.amount} onChange={(e) => updateExpense(idx, "amount", e.target.value)} placeholder="0.00" className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Date</label>
+                      <input type="date" value={exp.date} onChange={(e) => updateExpense(idx, "date", e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Category</label>
+                      <select value={exp.category} onChange={(e) => updateExpense(idx, "category", e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Merchant</label>
+                      <input type="text" value={exp.merchant} onChange={(e) => updateExpense(idx, "merchant", e.target.value)} placeholder="Vendor name" className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <input type="text" value={exp.notes} onChange={(e) => updateExpense(idx, "notes", e.target.value)} placeholder="Notes / purpose" className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-xs placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                    {expenses.length > 1 && (
+                      <button type="button" onClick={() => removeExpense(idx)} className="text-red-400 hover:text-red-300 text-xs px-2">✕</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Additional Notes</label>
+            <textarea value={additionalNotes} onChange={(e) => setAdditionalNotes(e.target.value)} rows={2} placeholder="Any additional context for the finance team..." className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm resize-none" />
+          </div>
+
+          <button type="submit" disabled={loading} className="w-full bg-orange-600 hover:bg-orange-500 disabled:bg-orange-800 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-6 rounded-xl transition-all duration-200 text-sm flex items-center justify-center gap-2">
+            {loading ? <><span className="animate-spin">⚙️</span>Generating Report...</> : "🧾 Generate Expense Report"}
+          </button>
+        </form>
+
+        {loading && (
+          <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-12 flex flex-col items-center justify-center text-gray-400 mt-6">
+            <div className="text-5xl mb-4 animate-pulse">🧾</div>
+            <p className="text-lg font-medium">Generating your expense report...</p>
+          </div>
+        )}
+        {error && (
+          <div className="bg-red-900/20 border border-red-800 rounded-2xl p-6 text-red-300 text-sm mt-6"><strong>Error:</strong> {error}</div>
+        )}
+        {result && !loading && (
+          <div className="bg-gray-900/60 border border-orange-500/30 rounded-2xl p-6 lg:p-8 mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-orange-300">🧾 Expense Report</h2>
+              <span className="text-xs text-gray-500">{submitterName} · {department}</span>
+            </div>
+            <div className="prose prose-invert prose-sm max-w-none text-gray-300 leading-relaxed whitespace-pre-wrap">{result}</div>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
